@@ -12,7 +12,7 @@ public enum States // used by all logic
     Idle,
     Walk,
     Jump,
-    Dead,
+    Sprint,
 };
 
 public class PlayerScript : MonoBehaviour
@@ -21,10 +21,22 @@ public class PlayerScript : MonoBehaviour
 
     InputAction moveAction;
     InputAction jumpAction;
+    InputAction sprintAction;
+
+    private CharacterController controller;
+    [SerializeField] private Transform camera;
+
+    [SerializeField] private float walkSpeed = 5f;
+    [SerializeField] private float runSpeed = 10f;
+    [SerializeField] private float turnSpeed = 2f;
+    [SerializeField] private float gravity = 10f;
+    [SerializeField] private float jumpHeight = 2f;
+
+    private float vertVelocity;
 
     public Animator anim;
-    Rigidbody rb;
     public bool grounded;
+    private bool sprintToggle = false;
 
     public float waiting = 3f;
     public bool deathCooldown = true;
@@ -33,36 +45,51 @@ public class PlayerScript : MonoBehaviour
     void Start()
     {
         state = States.Idle;
-        rb = GetComponent<Rigidbody>();
+        controller = GetComponent<CharacterController>();
         anim = GetComponent<Animator>();
         moveAction = InputSystem.actions.FindAction("Move");
         jumpAction = InputSystem.actions.FindAction("Jump");
+        sprintAction = InputSystem.actions.FindAction("Sprint");
     }
 
     // Update is called once per frame
     void Update()
     {
-        Vector2 moveValue = moveAction.ReadValue<Vector2>();
         DoLogic();
+        if(controller.isGrounded == true)
+        {
+            if (sprintAction.IsPressed() && sprintToggle == false)
+            {
+                state = States.Sprint;
+                sprintToggle = true;
+            }
+        }
     }
 
     private void LateUpdate()
     {
         grounded = false;
-
     }
 
 
     void DoLogic()
     {
+        print("State=" + state + "  Grounded=" + controller.isGrounded + "  yv=" + vertVelocity);
+
         if (state == States.Idle)
         {
             PlayerIdle();
+            DoGravity();
+            //VerticalForceCalc();
+
         }
 
         if (state == States.Jump)
         {
-            PlayerJumping();
+            PlayerJump();
+            DoGravity();
+            CheckForLanding();
+
         }
 
         if (state == States.Walk)
@@ -70,113 +97,119 @@ public class PlayerScript : MonoBehaviour
             PlayerWalk();
         }
 
-        if (state == States.Dead)
+        if (state == States.Sprint)
         {
-            PlayerDead();
+            PlayerSprint();
+            if (sprintAction.IsPressed())
+            {
+                sprintToggle = false;
+                state = States.Idle;
+            }
         }
     }
 
+    void PlayerJump()
+    {
+        anim.SetBool("isWalk", false);
+        anim.SetBool("isIdle", false);
+        anim.SetBool("isJump", true);
+
+
+    }
+
+    void PlayerSprint()
+    {
+        float h, v;
+        h = moveAction.ReadValue<Vector2>().x;
+        v = moveAction.ReadValue<Vector2>().y;
+
+        Vector3 move = new Vector3(h, 0, v);
+        move = camera.transform.TransformDirection(move);
+        move.y = vertVelocity;
+        move *= walkSpeed;
+        controller.Move(move * 2 * Time.deltaTime);
+
+        if (controller.isGrounded)
+        {
+        vertVelocity = -1f;
+
+        if (jumpAction.IsPressed())
+            {
+                state = States.Jump;
+            }
+        }
+    }
 
     void PlayerIdle()
     {
+        vertVelocity = -1;
+
         anim.SetBool("isWalk", false);
-        anim.SetBool("isDead", false);
+        anim.SetBool("isJump", false);
         anim.SetBool("isIdle", true);
-        deathCooldown = true;
-        waiting = 3f;
 
-        if (jumpAction.IsPressed())
+        if (jumpAction.IsPressed() && controller.isGrounded)
         {
-            // simulate jump
             state = States.Jump;
-            rb.linearVelocity = new Vector3(0, 5, 0);
+            vertVelocity = Mathf.Sqrt(jumpHeight * gravity);
+            return;
         }
 
-        if (moveAction.IsPressed())
-        {
-            transform.Rotate(0, 0.5f, 0, Space.Self);
-
-        }
-        if (moveAction.IsPressed())
-        {
-            transform.Rotate(0, -0.5f, 0, Space.Self);
-        }
-
-        if (moveAction.IsPressed())
+        if (moveAction.ReadValue<Vector2>().magnitude > 0.1f )
         {
             state = States.Walk;
+            return;
+ 
         }
+
+        DoGravity();
     }
 
-    void PlayerJumping()
+    private float VerticalForceCalc()
     {
-        // player is jumping, check for hitting the ground
-        if (grounded == true)
+        if(controller.isGrounded  )
         {
-            //player has landed on floor
-            state = States.Idle;
+            vertVelocity = -1f;
+
+            if(jumpAction.IsPressed())
+            {
+                state = States.Jump;
+            }
         }
+        else
+        {
+            vertVelocity -= gravity * Time.deltaTime;
+        }
+        return vertVelocity;
+    }
+
+
+    void PlayerWalkCalc()
+    {
+        float h, v;
+        h = moveAction.ReadValue<Vector2>().x;
+        v = moveAction.ReadValue<Vector2>().y;
+
+        Vector3 move = new Vector3(h, 0, v);
+        move = camera.transform.TransformDirection(move);
+        move.y = vertVelocity;
+        move *= walkSpeed;
+        controller.Move(move * Time.deltaTime);
     }
 
     void PlayerWalk()
     {
-        Vector3 vel;
         anim.SetBool("isWalk", true);
         anim.SetBool("isIdle", false);
+        anim.SetBool("isJump", false);
 
-        //magnitude = the player's speed
-        float magnitude = rb.linearVelocity.magnitude;
+        PlayerWalkCalc();
+        VerticalForceCalc();
 
-        //move forward and preserve original y velocity
-
-        if (moveAction.IsPressed())
-        {
-            vel = transform.forward * 5f;
-        }
-        else
-        {
-            vel = transform.forward * 0.5f;
-        }
-
-        rb.linearVelocity = new Vector3(vel.x, rb.linearVelocity.y, vel.z);
-
-        if (magnitude <= 0.5f)
+        if(moveAction.ReadValue<Vector2>().magnitude < 0.1f )
         {
             state = States.Idle;
         }
-
-        if (jumpAction.IsPressed())
-        {
-            // simulate jump
-            state = States.Jump;
-            rb.linearVelocity = new Vector3(vel.x, 5, vel.z);
-        }
-
-    }
-
-    void PlayerDead()
-    {
-        if (deathCooldown == true)
-        {
-            anim.SetBool("isIdle", false);
-            anim.SetBool("isWalk", false);
-            anim.SetBool("isDead", true);
-        }
-
-
-        waiting -= Time.deltaTime;
-        deathCooldown = false;
-
-
-        if (waiting <= 0)
-        {
-            state = States.Idle;
-            transform.position = new Vector3(9, 3, 5);
-            rb.angularVelocity = Vector3.zero;
-            print("reset transform");
-        }
-
-
     }
 
 
@@ -187,28 +220,23 @@ public class PlayerScript : MonoBehaviour
             grounded = true;
             print("landed!");
         }
+    }
 
-        if (col.gameObject.tag == "Enemy")
+    void DoGravity()
+    {
+        vertVelocity -= gravity * Time.deltaTime;
+
+        Vector3 vel = new Vector3(0, vertVelocity, 0);
+        controller.Move(vel * Time.deltaTime);
+    }
+
+    void CheckForLanding()
+    { 
+        if( controller.isGrounded && vertVelocity <= 0 )
         {
-            state = States.Dead;
+            state = States.Idle;
+            vertVelocity = -1;
         }
     }
 
-
-    //Output debug info to canvas
-    private void OnGUI()
-    {
-        float mag = rb.linearVelocity.magnitude;
-
-        mag = Mathf.Round(mag * 100) / 100;
-
-        //debug text
-        string text = "Left/Right arrows = Rotate\nSpace = Jump\nUp Arrow = Forward\nCurrent state=" + state;
-        text += "\nmag=" + mag;
-
-        // define debug text area
-        GUILayout.BeginArea(new Rect(10f, 450f, 1600f, 1600f));
-        GUILayout.Label($"<size=16>{text}</size>");
-        GUILayout.EndArea();
-    }
 }
