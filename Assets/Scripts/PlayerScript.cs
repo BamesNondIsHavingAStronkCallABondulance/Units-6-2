@@ -13,6 +13,7 @@ public enum States // used by all logic
     Walk,
     Jump,
     Sprint,
+    SprintJump,
 };
 
 public class PlayerScript : MonoBehaviour
@@ -30,7 +31,7 @@ public class PlayerScript : MonoBehaviour
     [SerializeField] private float runSpeed = 10f;
     [SerializeField] private float turnSpeed = 2f;
     [SerializeField] private float gravity = 10f;
-    [SerializeField] private float jumpHeight = 2f;
+    [SerializeField] private float jumpHeight = 1.1f;
 
     private float vertVelocity;
 
@@ -56,14 +57,6 @@ public class PlayerScript : MonoBehaviour
     void Update()
     {
         DoLogic();
-        if(controller.isGrounded == true)
-        {
-            if (sprintAction.IsPressed() && sprintToggle == false)
-            {
-                state = States.Sprint;
-                sprintToggle = true;
-            }
-        }
     }
 
     private void LateUpdate()
@@ -86,7 +79,6 @@ public class PlayerScript : MonoBehaviour
 
         if (state == States.Jump)
         {
-            PlayerJump();
             DoGravity();
             CheckForLanding();
 
@@ -100,44 +92,41 @@ public class PlayerScript : MonoBehaviour
         if (state == States.Sprint)
         {
             PlayerSprint();
-            if (sprintAction.IsPressed())
-            {
-                sprintToggle = false;
-                state = States.Idle;
-            }
         }
-    }
 
-    void PlayerJump()
-    {
-        anim.SetBool("isWalk", false);
-        anim.SetBool("isIdle", false);
-        anim.SetBool("isJump", true);
-
-
+        if (state == States.SprintJump)
+        {
+            PlayerSprintJump();
+            DoGravity();
+            CheckForLanding();
+        }
     }
 
     void PlayerSprint()
     {
-        float h, v;
-        h = moveAction.ReadValue<Vector2>().x;
-        v = moveAction.ReadValue<Vector2>().y;
+        anim.SetBool("isWalk", false);
+        anim.SetBool("isSprint", true);
+        anim.SetBool("isIdle", false);
+        anim.SetBool("isJump", false);
+        anim.SetBool("isSprintJump", false);
 
-        Vector3 move = new Vector3(h, 0, v);
-        move = camera.transform.TransformDirection(move);
-        move.y = vertVelocity;
-        move *= walkSpeed;
-        controller.Move(move * 2 * Time.deltaTime);
+        PlayerSprintCalc();
+        VerticalSprintForceCalc();
 
-        if (controller.isGrounded)
+        if (sprintAction.IsPressed())
         {
-        vertVelocity = -1f;
-
-        if (jumpAction.IsPressed())
-            {
-                state = States.Jump;
-            }
+            sprintToggle = false;
+            state = States.Walk;
         }
+
+        if (moveAction.ReadValue<Vector2>().magnitude < 0.1f)
+        {
+            state = States.Idle;
+        }
+
+        VerticalSprintForceCalc();
+        DoGravity();
+
     }
 
     void PlayerIdle()
@@ -146,13 +135,19 @@ public class PlayerScript : MonoBehaviour
 
         anim.SetBool("isWalk", false);
         anim.SetBool("isJump", false);
+        anim.SetBool("isSprint", false);
         anim.SetBool("isIdle", true);
 
         if (jumpAction.IsPressed() && controller.isGrounded)
         {
-            state = States.Jump;
             vertVelocity = Mathf.Sqrt(jumpHeight * gravity);
-            return;
+
+            anim.SetBool("isWalk", false);
+            anim.SetBool("isSprint", false);
+            anim.SetBool("isIdle", false);
+            anim.SetBool("isJump", true);
+
+            state = States.Jump;
         }
 
         if (moveAction.ReadValue<Vector2>().magnitude > 0.1f )
@@ -162,17 +157,31 @@ public class PlayerScript : MonoBehaviour
  
         }
 
+        if ( sprintAction.IsPressed())
+        {
+            state = States.Sprint;
+            return;
+        }
+
         DoGravity();
+        VerticalForceCalc();
     }
 
     private float VerticalForceCalc()
     {
-        if(controller.isGrounded  )
+        if(controller.isGrounded)
         {
             vertVelocity = -1f;
 
             if(jumpAction.IsPressed())
             {
+                vertVelocity = Mathf.Sqrt(jumpHeight * gravity);
+
+                anim.SetBool("isWalk", false);
+                anim.SetBool("isSprint", false);
+                anim.SetBool("isIdle", false);
+                anim.SetBool("isJump", true);
+
                 state = States.Jump;
             }
         }
@@ -181,6 +190,38 @@ public class PlayerScript : MonoBehaviour
             vertVelocity -= gravity * Time.deltaTime;
         }
         return vertVelocity;
+    }
+
+    private void VerticalSprintForceCalc()
+    {
+        if (controller.isGrounded)
+        {
+            vertVelocity = -1f;
+
+            if (jumpAction.IsPressed())
+            {
+
+                anim.SetBool("isWalk", false);
+                anim.SetBool("isSprint", false);
+                anim.SetBool("isIdle", false);
+                anim.SetBool("isSprintJump", true);
+
+                state = States.SprintJump;
+            }
+        }
+        else
+        {
+            vertVelocity -= gravity * Time.deltaTime;
+        }
+        //return vertVelocity;
+    }
+
+    void PlayerSprintJump()
+    {
+        anim.SetBool("isSprint", false);
+        anim.SetBool("isSprintJump", true);
+
+
     }
 
 
@@ -197,11 +238,25 @@ public class PlayerScript : MonoBehaviour
         controller.Move(move * Time.deltaTime);
     }
 
+    void PlayerSprintCalc()
+    {
+        float h, v;
+        h = moveAction.ReadValue<Vector2>().x;
+        v = moveAction.ReadValue<Vector2>().y;
+
+        Vector3 move = new Vector3(h, 0, v);
+        move = camera.transform.TransformDirection(move);
+        move.y = vertVelocity;
+        move *= runSpeed;
+        controller.Move(move * Time.deltaTime);
+    }
+
     void PlayerWalk()
     {
         anim.SetBool("isWalk", true);
         anim.SetBool("isIdle", false);
         anim.SetBool("isJump", false);
+        anim.SetBool("isSprint", false);
 
         PlayerWalkCalc();
         VerticalForceCalc();
@@ -209,6 +264,12 @@ public class PlayerScript : MonoBehaviour
         if(moveAction.ReadValue<Vector2>().magnitude < 0.1f )
         {
             state = States.Idle;
+        }
+
+        if (sprintAction.IsPressed())
+        {
+            state = States.Sprint;
+            return;
         }
     }
 
@@ -226,7 +287,8 @@ public class PlayerScript : MonoBehaviour
     {
         vertVelocity -= gravity * Time.deltaTime;
 
-        Vector3 vel = new Vector3(0, vertVelocity, 0);
+        Vector3 vel = new Vector3(controller.velocity.x, vertVelocity, controller.velocity.z);
+
         controller.Move(vel * Time.deltaTime);
     }
 
