@@ -27,8 +27,8 @@ public class PlayerScript : MonoBehaviour
     private CharacterController controller;
     [SerializeField] private Transform camera;
 
-    [SerializeField] private float walkSpeed = 5f;
-    [SerializeField] private float runSpeed = 10f;
+    [SerializeField] private float walkSpeed = 2f;
+    [SerializeField] private float runSpeed = 5f;
     [SerializeField] private float turnSpeed = 2f;
     [SerializeField] private float gravity = 10f;
     [SerializeField] private float jumpHeight = 1.1f;
@@ -97,7 +97,7 @@ public class PlayerScript : MonoBehaviour
         if (state == States.SprintJump)
         {
             PlayerSprintJump();
-            DoGravity();
+            DoSprintGravity();
             CheckForLanding();
         }
     }
@@ -176,12 +176,10 @@ public class PlayerScript : MonoBehaviour
             if(jumpAction.IsPressed())
             {
                 vertVelocity = Mathf.Sqrt(jumpHeight * gravity);
-
-                anim.SetBool("isWalk", false);
-                anim.SetBool("isSprint", false);
-                anim.SetBool("isIdle", false);
-                anim.SetBool("isJump", true);
-
+                if (state == States.Walk)
+                {
+                    anim.SetBool("isSprintJump", true);
+                }
                 state = States.Jump;
             }
         }
@@ -292,10 +290,22 @@ public class PlayerScript : MonoBehaviour
         controller.Move(vel * Time.deltaTime);
     }
 
+    void DoSprintGravity()
+    {
+        vertVelocity -= gravity * Time.deltaTime;
+
+        Vector3 vel = new Vector3(controller.velocity.x, vertVelocity, controller.velocity.z);
+
+        controller.Move(vel * Time.deltaTime);
+    }
+
     void CheckForLanding()
     { 
         if( controller.isGrounded && vertVelocity <= 0 )
         {
+            anim.SetBool("isWalk", true);
+            anim.SetBool("isSprintJump", false);
+
             state = States.Idle;
             vertVelocity = -1;
         }
