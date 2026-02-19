@@ -295,8 +295,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.28636187, y: 0.008706346, z: -0.0026022561, w: 0.95807844}
-  m_LocalPosition: {x: 0, y: 3, z: -5.84}
+  m_LocalRotation: {x: 0.35355875, y: 0.0084999725, z: -0.0032128948, w: 0.93536824}
+  m_LocalPosition: {x: 0, y: 3, z: -4.84}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -720,9 +720,9 @@ MonoBehaviour:
   Orbits:
     Top:
       Radius: 1
-      Height: 8
+      Height: 6
     Center:
-      Radius: 4
+      Radius: 3
       Height: 4
     Bottom:
       Radius: 2.5
@@ -810,8 +810,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 659969703}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.28636187, y: 0.008706345, z: -0.0026022552, w: 0.95807844}
-  m_LocalPosition: {x: 0, y: 3, z: -5.84}
+  m_LocalRotation: {x: 0.35355872, y: 0.008499972, z: -0.0032128938, w: 0.93536824}
+  m_LocalPosition: {x: 0, y: 3, z: -4.84}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -867,6 +867,7 @@ MonoBehaviour:
   camera: {fileID: 330585546}
   walkSpeed: 5
   runSpeed: 10
+  crouchSpeed: 0.75
   turnSpeed: 2
   gravity: 10
   jumpHeight: 2
@@ -1230,9 +1231,9 @@ SceneRoots:
   - {fileID: 410087041}
   - {fileID: 832575519}
   - {fileID: 659969709}
-  - {fileID: 333683637}
   - {fileID: 146952016}
   - {fileID: 2073850768}
   - {fileID: 1014867953}
   - {fileID: 1363247606}
   - {fileID: 1059463939}
+  - {fileID: 333683637}
