@@ -14,7 +14,6 @@ public enum States // used by all logic
     Jump,
     Sprint,
     SprintJump,
-    CrouchWalk,
 };
 
 public class PlayerScript : MonoBehaviour
@@ -54,7 +53,6 @@ public class PlayerScript : MonoBehaviour
         moveAction = InputSystem.actions.FindAction("Move");
         jumpAction = InputSystem.actions.FindAction("Jump");
         sprintAction = InputSystem.actions.FindAction("Sprint");
-        crouchAction = InputSystem.actions.FindAction("Sprint");
     }
 
     // Update is called once per frame
