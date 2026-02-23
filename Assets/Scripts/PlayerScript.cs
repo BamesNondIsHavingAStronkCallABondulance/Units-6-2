@@ -13,17 +13,17 @@ public enum States // used by all logic
     Walk,
     Jump,
     Sprint,
-    SprintJump,
+    Interact, 
 };
 
 public class PlayerScript : MonoBehaviour
 {
     States state;
+    States lastState;
 
     InputAction moveAction;
     InputAction jumpAction;
     InputAction sprintAction;
-    InputAction crouchAction;
 
     private CharacterController controller;
     [SerializeField] private Transform camera;
@@ -39,7 +39,6 @@ public class PlayerScript : MonoBehaviour
 
     public Animator anim;
     public bool grounded;
-    private bool sprintToggle = false;
 
     public float waiting = 3f;
     public bool deathCooldown = true;
@@ -53,12 +52,18 @@ public class PlayerScript : MonoBehaviour
         moveAction = InputSystem.actions.FindAction("Move");
         jumpAction = InputSystem.actions.FindAction("Jump");
         sprintAction = InputSystem.actions.FindAction("Sprint");
+
     }
 
     // Update is called once per frame
     void Update()
     {
-        DoLogic();
+        StateLogic();
+
+        if (InteractableObjects.openChest == true)
+        {
+            state = States.Interact;
+        }
     }
 
     private void LateUpdate()
@@ -67,83 +72,68 @@ public class PlayerScript : MonoBehaviour
     }
 
 
-    void DoLogic()
+    void StateLogic()
     {
-        print("State=" + state + "  Grounded=" + controller.isGrounded + "  yv=" + vertVelocity);
 
-        if (state == States.Idle)
+        switch (state)
         {
-            PlayerIdle();
-            DoGravity();
-            //VerticalForceCalc();
+            case States.Idle:
+                IdleState();
+                break;
 
-        }
+            case States.Jump:
+                JumpState();
+                break;
 
-        if (state == States.Jump)
-        {
-            DoGravity();
-            CheckForLanding();
+            case States.Walk:
+                WalkState();
+                break;
 
-        }
+            case States.Interact:
+                InteractState();
+                break;
 
-        if (state == States.CrouchWalk)
-        {
-            anim.SetBool("isWalk", false);
-            anim.SetBool("isIdle", false);
-            anim.SetBool("isCrouchWalk", true);
-
-            DoGravity();
-            PlayerCrouchCalc();
-
-            if (crouchAction.IsPressed())
-            {
-                state = States.Walk;
-            }
-        }
-
-        if (state == States.Walk)
-        {
-            PlayerWalk();
-        }
-
-        if (state == States.Sprint)
-        {
-            PlayerSprint();
-        }
-
-        if (state == States.SprintJump)
-        {
-            PlayerSprintJump();
-            DoSprintGravity();
-            CheckForLanding();
         }
     }
 
-    void PlayerSprint()
+    void IdleState()
     {
-        anim.SetBool("isWalk", false);
-        anim.SetBool("isSprint", true);
-        anim.SetBool("isIdle", false);
-        anim.SetBool("isJump", false);
-        anim.SetBool("isSprintJump", false);
+        PlayerIdle();
+        DoGravity();
 
-        PlayerSprintCalc();
-        VerticalSprintForceCalc();
 
-        if (sprintAction.IsPressed())
+    }
+
+    void JumpState()
+    {
+        DoGravity();
+        CheckForLanding();
+    }
+
+    void WalkState()
+    {
+        PlayerWalk();
+    }
+
+    void InteractState()
+    {
+        PlayerInteract();
+    }
+
+    void PlayerInteract()
+    {
+        if (InteractableObjects.openChest == true)
         {
-            sprintToggle = false;
-            state = States.Walk;
+            anim.SetBool("isInteract", true);
+            anim.SetBool("isWalk", false);
+            anim.SetBool("isJump", false);
+            anim.SetBool("isSprint", false);
+            anim.SetBool("isIdle", false);
         }
-
-        if (moveAction.ReadValue<Vector2>().magnitude < 0.1f)
+        else
         {
             state = States.Idle;
         }
-
-        VerticalSprintForceCalc();
-        DoGravity();
-
     }
 
     void PlayerIdle()
@@ -153,6 +143,7 @@ public class PlayerScript : MonoBehaviour
         anim.SetBool("isWalk", false);
         anim.SetBool("isJump", false);
         anim.SetBool("isSprint", false);
+        anim.SetBool("isInteract", false);
         anim.SetBool("isIdle", true);
 
         if (jumpAction.IsPressed() && controller.isGrounded)
@@ -163,6 +154,7 @@ public class PlayerScript : MonoBehaviour
             anim.SetBool("isSprint", false);
             anim.SetBool("isIdle", false);
             anim.SetBool("isJump", true);
+            anim.SetBool("isInteract", false);
 
             state = States.Jump;
         }
@@ -170,22 +162,9 @@ public class PlayerScript : MonoBehaviour
         if (moveAction.ReadValue<Vector2>().magnitude > 0.1f )
         {
             state = States.Walk;
-            return;
  
         }
 
-        if ( sprintAction.IsPressed())
-        {
-            state = States.Sprint;
-            return;
-        }
-
-        if (crouchAction.IsPressed())
-        {
-            state = States.CrouchWalk;
-        }
-
-        DoGravity();
         VerticalForceCalc();
     }
 
@@ -208,39 +187,6 @@ public class PlayerScript : MonoBehaviour
         return vertVelocity;
     }
 
-    private void VerticalSprintForceCalc()
-    {
-        if (controller.isGrounded)
-        {
-            vertVelocity = -1f;
-
-            if (jumpAction.IsPressed())
-            {
-
-                anim.SetBool("isWalk", false);
-                anim.SetBool("isSprint", false);
-                anim.SetBool("isIdle", false);
-                anim.SetBool("isSprintJump", true);
-
-                state = States.SprintJump;
-            }
-        }
-        else
-        {
-            vertVelocity -= gravity * Time.deltaTime;
-        }
-        //return vertVelocity;
-    }
-
-    void PlayerSprintJump()
-    {
-        anim.SetBool("isSprint", false);
-        anim.SetBool("isSprintJump", true);
-
-
-    }
-
-
     void PlayerWalkCalc()
     {
         float h, v;
@@ -254,19 +200,6 @@ public class PlayerScript : MonoBehaviour
         controller.Move(move * Time.deltaTime);
     }
 
-    void PlayerCrouchCalc()
-    {
-        float h, v;
-        h = moveAction.ReadValue<Vector2>().x;
-        v = moveAction.ReadValue<Vector2>().y;
-
-        Vector3 move = new Vector3(h, 0, v);
-        move = camera.transform.TransformDirection(move);
-        move.y = vertVelocity;
-        move *= crouchSpeed;
-        controller.Move(move * Time.deltaTime);
-    }
-
     void PlayerSprintCalc()
     {
         float h, v;
@@ -277,15 +210,18 @@ public class PlayerScript : MonoBehaviour
         move = camera.transform.TransformDirection(move);
         move.y = vertVelocity;
         move *= runSpeed;
-        controller.Move(move * Time.deltaTime);
+        controller.Move(move / 2 * Time.deltaTime);
     }
 
     void PlayerWalk()
     {
+
         anim.SetBool("isWalk", true);
         anim.SetBool("isIdle", false);
         anim.SetBool("isJump", false);
-        anim.SetBool("isSprint", false);
+        anim.SetBool("isInteract", false);
+
+
 
         PlayerWalkCalc();
         VerticalForceCalc();
@@ -293,40 +229,26 @@ public class PlayerScript : MonoBehaviour
         if(moveAction.ReadValue<Vector2>().magnitude < 0.1f )
         {
             state = States.Idle;
+            return;
         }
 
         if (sprintAction.IsPressed())
         {
-            state = States.Sprint;
-            return;
+            //state = States.Sprint;
+            anim.SetBool("isSprint", true);
+            anim.SetBool("isWalk", false);
+
+            PlayerSprintCalc();
         }
-
-        if (crouchAction.IsPressed())
+        else
         {
-            state = States.CrouchWalk;
-        }
-    }
+            anim.SetBool("isSprint", false);
+            anim.SetBool("isWalk", true);
 
-
-    void OnCollisionEnter(Collision col)
-    {
-        if (col.gameObject.tag == "Floor")
-        {
-            grounded = true;
-            print("landed!");
         }
     }
 
     void DoGravity()
-    {
-        vertVelocity -= gravity * Time.deltaTime;
-
-        Vector3 vel = new Vector3(controller.velocity.x, vertVelocity, controller.velocity.z);
-
-        controller.Move(vel * Time.deltaTime);
-    }
-
-    void DoSprintGravity()
     {
         vertVelocity -= gravity * Time.deltaTime;
 
@@ -340,7 +262,6 @@ public class PlayerScript : MonoBehaviour
         if( controller.isGrounded && vertVelocity <= 0 )
         {
             anim.SetBool("isWalk", true);
-            anim.SetBool("isSprintJump", false);
 
             state = States.Idle;
             vertVelocity = -1;
